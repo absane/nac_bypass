@@ -8,6 +8,7 @@
 # Matt E - NACkered v2.92.2 - KPMG LLP 2014
 # KPMG UK Cyber Defence Services
 # -----
+# Modified to update behavior on obtaining client IP, MAC, and gateway MAC.
 
 ## Variables
 VERSION="0.6.4"
