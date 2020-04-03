@@ -215,20 +215,34 @@ ConnectionSetup() {
 
     if [ "$OPTION_AUTONOMOUS" -eq 0 ]; then
         echo
-        echo -e "$INFO [ * ] Listening for Traffic (Kerberos and SMB)...$TXTRST"
+        echo -e "$INFO [ * ] Listening for Traffic...$TXTRST"
         echo
     fi
 
-    ## We pcap any kerberos or smb traffic should be some in Windows land
-    ## Default: $TCPDUMP_PORT_1 = 88 and $TCPDUMP_PORT_2 = 445
-    tcpdump -i $COMPINT -s0 -w $TEMP_FILE -c1 tcp dst port $TCPDUMP_PORT_1 or port $TCPDUMP_PORT_2
+    ## We pcap trafic to obtain computer IP, computer MAC, and gateway MAC
+    # Listen for 500 incoming TCP packets
+    tcpdump -i $COMPINT --direction=in -s0 -w $TEMP_FILE -c500 tcp
+    
+    # Grab computer IP
+    COMIP=`tcpdump -r $TEMP_FILE --direction=in -nne -c 100 tcp | awk '{print $10}' |cut -f 1-4 -d. | sort | uniq -c | head | awk '{print $2}'`
 
-    COMPMAC=`tcpdump -r $TEMP_FILE -nne -c 1 tcp dst port $TCPDUMP_PORT_1 or port $TCPDUMP_PORT_2 | awk '{print $2","$4$10}' | cut -f 1-4 -d.| awk -F ',' '{print $1}'`
+    # Grab computer MAC address
+    COMPMAC=`tcpdump -r $TEMP_FILE --direction=in -nne -c 100 tcp | awk '{print $2","$4$10}' | cut -f 1-4 -d.| awk -F ',' '{print $1}' | sort | uniq -c | head | awk '{print $2}'`
+    
+    # Grab gateway MAC if not specified by command line
     if [ -z "$GWMAC" ]; then
-        GWMAC=`tcpdump -r $TEMP_FILE -nne -c 1 tcp dst port $TCPDUMP_PORT_1 or port $TCPDUMP_PORT_2 | awk '{print $2","$4$10}' |cut -f 1-4 -d.| awk -F ',' '{print $2}'`
+        GWMAC=`tcpdump -r $TEMP_FILE --direction=in -nne -c 100 tcp | awk '{print $2","$4$10}' |cut -f 1-4 -d.| awk -F ',' '{print $2}' | sort | uniq -c | head | awk '{print $2}'`
     fi
-    COMIP=`tcpdump -r $TEMP_FILE -nne -c 1 tcp dst port $TCPDUMP_PORT_1 or port $TCPDUMP_PORT_2 | awk '{print $3","$4$10}' |cut -f 1-4 -d.| awk -F ',' '{print $3}'`
 
+    # Save a history of these. Sometimes we get the wrong values.
+    # If that is the case, we can manually fix this based on history
+    FILE=addressHistory.csv
+    if [ ! -f "$FILE" ]; then
+        echo "Computer IP,Computer MAC,Gateway MAC" > $FILE
+    fi
+
+    echo "$COMIP,$COMPMAC,$GWMAC" >> $FILE
+    
     if [ "$OPTION_AUTONOMOUS" -eq 0 ]; then
         echo
         echo -e "$INFO [ * ] Processing packet and setting veriables $TXTRST"
